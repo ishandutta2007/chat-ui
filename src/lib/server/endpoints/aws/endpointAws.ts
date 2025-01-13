@@ -8,54 +8,64 @@ export const endpointAwsParametersSchema = z.object({
 	model: z.any(),
 	type: z.literal("aws"),
 	url: z.string().url(),
-	accessKey: z.string().min(1),
-	secretKey: z.string().min(1),
+	accessKey: z
+		.string({
+			description:
+				"An AWS Access Key ID. If not provided, the default AWS identity resolution will be used",
+		})
+		.min(1)
+		.optional(),
+	secretKey: z
+		.string({
+			description:
+				"An AWS Access Key Secret. If not provided, the default AWS identity resolution will be used",
+		})
+		.min(1)
+		.optional(),
 	sessionToken: z.string().optional(),
 	service: z.union([z.literal("sagemaker"), z.literal("lambda")]).default("sagemaker"),
 	region: z.string().optional(),
 });
 
-export async function endpointAws({
-	url,
-	accessKey,
-	secretKey,
-	sessionToken,
-	model,
-	region,
-	service,
-}: z.infer<typeof endpointAwsParametersSchema>): Promise<Endpoint> {
-	let AwsClient;
+export async function endpointAws(
+	input: z.input<typeof endpointAwsParametersSchema>
+): Promise<Endpoint> {
+	let createSignedFetcher;
 	try {
-		AwsClient = (await import("aws4fetch")).AwsClient;
+		createSignedFetcher = (await import("aws-sigv4-fetch")).createSignedFetcher;
 	} catch (e) {
-		throw new Error("Failed to import aws4fetch");
+		throw new Error("Failed to import aws-sigv4-fetch");
 	}
 
-	const aws = new AwsClient({
-		accessKeyId: accessKey,
-		secretAccessKey: secretKey,
-		sessionToken,
+	const { url, accessKey, secretKey, sessionToken, model, region, service } =
+		endpointAwsParametersSchema.parse(input);
+
+	const signedFetch = createSignedFetcher({
 		service,
 		region,
+		credentials:
+			accessKey && secretKey
+				? { accessKeyId: accessKey, secretAccessKey: secretKey, sessionToken }
+				: undefined,
 	});
 
-	return async ({ conversation }) => {
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+			messages,
+			continueMessage,
+			preprompt,
 			model,
 		});
 
 		return textGenerationStream(
 			{
-				parameters: { ...model.parameters, return_full_text: false },
+				parameters: { ...model.parameters, ...generateSettings, return_full_text: false },
 				model: url,
 				inputs: prompt,
 			},
 			{
 				use_cache: false,
-				fetch: aws.fetch.bind(aws) as typeof fetch,
+				fetch: signedFetch,
 			}
 		);
 	};

@@ -24,7 +24,7 @@ module.exports = {
 		extraFileExtensions: [".svelte"],
 	},
 	rules: {
-		"no-shadow": ["error"],
+		"require-yield": "off",
 		"@typescript-eslint/no-explicit-any": "error",
 		"@typescript-eslint/no-non-null-assertion": "error",
 		"@typescript-eslint/no-unused-vars": [
@@ -34,6 +34,7 @@ module.exports = {
 				argsIgnorePattern: "^_",
 			},
 		],
+		"object-shorthand": ["error", "always"],
 	},
 	env: {
 		browser: true,

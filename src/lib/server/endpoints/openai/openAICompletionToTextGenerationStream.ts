@@ -13,7 +13,7 @@ export async function* openAICompletionToTextGenerationStream(
 	for await (const completion of completionStream) {
 		const { choices } = completion;
 		const text = choices[0]?.text ?? "";
-		const last = choices[0]?.finish_reason === "stop";
+		const last = choices[0]?.finish_reason === "stop" || choices[0]?.finish_reason === "length";
 		if (text) {
 			generatedText = generatedText + text;
 		}
@@ -22,7 +22,7 @@ export async function* openAICompletionToTextGenerationStream(
 				id: tokenId++,
 				text,
 				logprob: 0,
-				special: false,
+				special: last,
 			},
 			generated_text: last ? generatedText : null,
 			details: null,

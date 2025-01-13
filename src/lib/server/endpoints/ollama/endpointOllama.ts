@@ -11,18 +11,43 @@ export const endpointOllamaParametersSchema = z.object({
 	ollamaName: z.string().min(1).optional(),
 });
 
-export function endpointOllama({
-	url,
-	model,
-	ollamaName,
-}: z.infer<typeof endpointOllamaParametersSchema>): Endpoint {
-	return async ({ conversation }) => {
+export function endpointOllama(input: z.input<typeof endpointOllamaParametersSchema>): Endpoint {
+	const { url, model, ollamaName } = endpointOllamaParametersSchema.parse(input);
+
+	return async ({ messages, preprompt, continueMessage, generateSettings }) => {
 		const prompt = await buildPrompt({
-			messages: conversation.messages,
-			webSearch: conversation.messages[conversation.messages.length - 1].webSearch,
-			preprompt: conversation.preprompt,
+			messages,
+			continueMessage,
+			preprompt,
 			model,
 		});
+
+		const parameters = { ...model.parameters, ...generateSettings };
+
+		const requestInfo = await fetch(`${url}/api/tags`, {
+			method: "GET",
+			headers: {
+				"Content-Type": "application/json",
+			},
+		});
+
+		const tags = await requestInfo.json();
+
+		if (!tags.models.some((m: { name: string }) => m.name === ollamaName)) {
+			// if its not in the tags, pull but dont wait for the answer
+			fetch(`${url}/api/pull`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					name: ollamaName ?? model.name,
+					stream: false,
+				}),
+			});
+
+			throw new Error("Currently pulling model from Ollama, please try again later.");
+		}
 
 		const r = await fetch(`${url}/api/generate`, {
 			method: "POST",
@@ -34,12 +59,12 @@ export function endpointOllama({
 				model: ollamaName ?? model.name,
 				raw: true,
 				options: {
-					top_p: model.parameters.top_p,
-					top_k: model.parameters.top_k,
-					temperature: model.parameters.temperature,
-					repeat_penalty: model.parameters.repetition_penalty,
-					stop: model.parameters.stop,
-					num_predict: model.parameters.max_new_tokens,
+					top_p: parameters.top_p,
+					top_k: parameters.top_k,
+					temperature: parameters.temperature,
+					repeat_penalty: parameters.repetition_penalty,
+					stop: parameters.stop,
+					num_predict: parameters.max_new_tokens,
 				},
 			}),
 		});

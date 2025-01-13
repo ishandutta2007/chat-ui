@@ -1,41 +1,68 @@
 <script lang="ts">
-	import type { WebSearchUpdate } from "$lib/types/MessageUpdate";
-	import CarbonCaretRight from "~icons/carbon/caret-right";
+	import {
+		MessageWebSearchUpdateType,
+		type MessageWebSearchUpdate,
+	} from "$lib/types/MessageUpdate";
+	import { isMessageWebSearchSourcesUpdate } from "$lib/utils/messageUpdates";
 
-	import CarbonCheckmark from "~icons/carbon/checkmark-filled";
 	import CarbonError from "~icons/carbon/error-filled";
-
 	import EosIconsLoading from "~icons/eos-icons/loading";
+	import IconInternet from "./icons/IconInternet.svelte";
+	import CarbonCaretDown from "~icons/carbon/caret-down";
 
-	export let loading = false;
-	export let classNames = "";
-	export let webSearchMessages: WebSearchUpdate[] = [];
+	export let webSearchMessages: MessageWebSearchUpdate[] = [];
 
-	let detailsOpen: boolean;
-	let error: boolean;
-	$: error = webSearchMessages[webSearchMessages.length - 1]?.messageType === "error";
+	$: sources = webSearchMessages.find(isMessageWebSearchSourcesUpdate)?.sources;
+	$: lastMessage = webSearchMessages
+		.filter((update) => update.subtype !== MessageWebSearchUpdateType.Sources)
+		.at(-1) as MessageWebSearchUpdate;
+	$: errored = webSearchMessages.some(
+		(update) => update.subtype === MessageWebSearchUpdateType.Error
+	);
+	$: loading = !sources && !errored;
 </script>
 
 <details
-	class="flex w-fit rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 {classNames} max-w-full"
-	bind:open={detailsOpen}
+	class="group flex w-fit max-w-full flex-col rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
 >
 	<summary
-		class="align-center flex cursor-pointer select-none list-none py-1 pl-2.5 pr-2 align-text-top transition-all"
+		class="grid min-w-72 cursor-pointer select-none grid-cols-[40px,1fr,24px] items-center gap-2.5 rounded-xl p-2 group-open:rounded-b-none hover:bg-gray-500/10"
 	>
-		{#if error}
-			<CarbonError class="my-auto text-red-700 dark:text-red-500" />
-		{:else if loading}
-			<EosIconsLoading class="my-auto text-gray-500" />
-		{:else}
-			<CarbonCheckmark class="my-auto text-gray-500" />
-		{/if}
-		<span class="px-2 font-medium" class:text-red-700={error} class:dark:text-red-500={error}
-			>Web search
-		</span>
-		<div class="my-auto transition-all" class:rotate-90={detailsOpen}>
-			<CarbonCaretRight />
+		<div
+			class="relative grid aspect-square place-content-center overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800"
+		>
+			<svg
+				class="absolute inset-0 text-gray-300 transition-opacity dark:text-gray-700 {loading
+					? 'opacity-100'
+					: 'opacity-0'}"
+				width="40"
+				height="40"
+				viewBox="0 0 38 38"
+				fill="none"
+				xmlns="http://www.w3.org/2000/svg"
+			>
+				<path
+					class="loading-path"
+					d="M8 2.5H30C30 2.5 35.5 2.5 35.5 8V30C35.5 30 35.5 35.5 30 35.5H8C8 35.5 2.5 35.5 2.5 30V8C2.5 8 2.5 2.5 8 2.5Z"
+					stroke="currentColor"
+					stroke-width="1"
+					stroke-linecap="round"
+					id="shape"
+				/>
+			</svg>
+			<IconInternet classNames="relative fill-current text-xl" />
 		</div>
+		<dl class="leading-4">
+			<dd class="text-sm">Web Search</dd>
+			<dt class="flex items-center gap-1 truncate whitespace-nowrap text-[.82rem] text-gray-400">
+				{#if sources}
+					Completed
+				{:else}
+					{"message" in lastMessage ? lastMessage.message : "An error occurred"}
+				{/if}
+			</dt>
+		</dl>
+		<CarbonCaretDown class="size-6 text-gray-400 transition-transform group-open:rotate-180" />
 	</summary>
 
 	<div class="content px-5 pb-5 pt-4">
@@ -46,7 +73,7 @@
 		{:else}
 			<ol>
 				{#each webSearchMessages as message}
-					{#if message.messageType === "update"}
+					{#if message.subtype === MessageWebSearchUpdateType.Update}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<div
@@ -59,12 +86,12 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}
 						</li>
-					{:else if message.messageType === "error"}
+					{:else if message.subtype === MessageWebSearchUpdateType.Error}
 						<li class="group border-l pb-6 last:!border-transparent last:pb-0 dark:border-gray-800">
 							<div class="flex items-start">
 								<CarbonError
@@ -75,7 +102,7 @@
 								</h3>
 							</div>
 							{#if message.args}
-								<p class="mt-1.5 pl-4 text-gray-500 dark:text-gray-400">
+								<p class="mt-0.5 pl-4 text-gray-500 dark:text-gray-400">
 									{message.args}
 								</p>
 							{/if}
@@ -88,27 +115,18 @@
 </details>
 
 <style>
-	@keyframes grow {
-		0% {
-			font-size: 0;
-			opacity: 0;
-		}
-		30% {
-			font-size: 1em;
-			opacity: 0;
-		}
-		100% {
-			opacity: 1;
-		}
-	}
-
-	details[open] .content {
-		animation-name: grow;
-		animation-duration: 300ms;
-		animation-delay: 0ms;
-	}
-
 	details summary::-webkit-details-marker {
 		display: none;
+	}
+
+	.loading-path {
+		stroke-dasharray: 61.45;
+		animation: loading 2s linear infinite;
+	}
+
+	@keyframes loading {
+		to {
+			stroke-dashoffset: 122.9;
+		}
 	}
 </style>
