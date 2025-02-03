@@ -1,16 +1,19 @@
 import { smallModel } from "$lib/server/models";
-import type { Conversation } from "$lib/types/Conversation";
+import { MessageUpdateType, type MessageUpdate } from "$lib/types/MessageUpdate";
+import type { EndpointMessage } from "./endpoints/endpoints";
 
-export async function generateFromDefaultEndpoint({
+export async function* generateFromDefaultEndpoint({
 	messages,
 	preprompt,
+	generateSettings,
 }: {
-	messages: Omit<Conversation["messages"][0], "id">[];
+	messages: EndpointMessage[];
 	preprompt?: string;
-}): Promise<string> {
+	generateSettings?: Record<string, unknown>;
+}): AsyncGenerator<MessageUpdate, string, undefined> {
 	const endpoint = await smallModel.getEndpoint();
 
-	const tokenStream = await endpoint({ conversation: { messages, preprompt } });
+	const tokenStream = await endpoint({ messages, preprompt, generateSettings });
 
 	for await (const output of tokenStream) {
 		// if not generated_text is here it means the generation is not done
@@ -23,6 +26,10 @@ export async function generateFromDefaultEndpoint({
 			}
 			return generated_text;
 		}
+		yield {
+			type: MessageUpdateType.Stream,
+			token: output.token.text,
+		};
 	}
 	throw new Error("Generation failed");
 }

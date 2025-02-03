@@ -1,14 +1,10 @@
 import type { Message } from "./Message";
-
-export type LegacyParamatersTemplateInput = {
-	preprompt?: string;
-	userMessageToken: string;
-	userMessageEndToken: string;
-	assistantMessageToken: string;
-	assistantMessageEndToken: string;
-};
+import type { Tool, ToolResult } from "./Tool";
 
 export type ChatTemplateInput = {
-	messages: Pick<Message, "from" | "content">[];
+	messages: Pick<Message, "from" | "content" | "files">[];
 	preprompt?: string;
+	tools?: Tool[];
+	toolResults?: ToolResult[];
+	continueMessage?: boolean;
 };

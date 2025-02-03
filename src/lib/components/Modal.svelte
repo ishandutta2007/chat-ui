@@ -21,6 +21,9 @@
 	}
 
 	function handleBackdropClick(event: MouseEvent) {
+		if (window?.getSelection()?.toString()) {
+			return;
+		}
 		if (event.target === backdropEl) {
 			dispatch("close");
 		}
@@ -46,8 +49,8 @@
 		role="presentation"
 		tabindex="-1"
 		bind:this={backdropEl}
-		on:click={handleBackdropClick}
-		transition:fade|global={{ easing: cubicOut, duration: 300 }}
+		on:click|stopPropagation={handleBackdropClick}
+		transition:fade|local={{ easing: cubicOut, duration: 300 }}
 		class="fixed inset-0 z-40 flex items-center justify-center bg-black/80 p-8 backdrop-blur-sm dark:bg-black/50"
 	>
 		<div
